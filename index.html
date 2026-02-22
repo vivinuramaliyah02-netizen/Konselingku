@@ -5,6 +5,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KonselingKu — Sistem Jadwal BK Digital</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, push, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBjR7zAH-gRdlceolJsp2Q6TpCxz-DZTbI",
+    authDomain: "konselingku-a9ea8.firebaseapp.com",
+    databaseURL: "https://konselingku-a9ea8-default-rtdb.firebaseio.com",
+    projectId: "konselingku-a9ea8",
+    storageBucket: "konselingku-a9ea8.firebasestorage.app",
+    messagingSenderId: "797846338894",
+    appId: "1:797846338894:web:ae83b26442da67744bf21f",
+    measurementId: "G-86XCEGRT17"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // ===== SIMPAN BOOKING KE FIREBASE =====
+  window.simpanBooking = function(data) {
+    const bookingsRef = ref(db, 'bookings');
+    const newBookingRef = push(bookingsRef);
+    return set(newBookingRef, {
+      ...data,
+      id: newBookingRef.key,
+      status: 'menunggu',
+      createdAt: new Date().toISOString()
+    }).then(() => newBookingRef.key);
+  };
+
+  // ===== LOAD BOOKING DARI FIREBASE (GURU) =====
+  window.loadBookings = function(callback) {
+    const bookingsRef = ref(db, 'bookings');
+    onValue(bookingsRef, (snapshot) => {
+      const data = snapshot.val();
+      const list = data ? Object.entries(data).map(([k, v]) => ({...v, id: k})) : [];
+      callback(list);
+    });
+  };
+
+  // ===== UPDATE STATUS BOOKING =====
+  window.updateStatus = function(id, status) {
+    const bookingRef = ref(db, 'bookings/' + id);
+    return update(bookingRef, { status, updatedAt: new Date().toISOString() });
+  };
+
+  // ===== LOAD BOOKING SISWA =====
+  window.loadBookingsSiswa = function(nama, callback) {
+    const bookingsRef = ref(db, 'bookings');
+    onValue(bookingsRef, (snapshot) => {
+      const data = snapshot.val();
+      const list = data
+        ? Object.entries(data)
+            .map(([k, v]) => ({...v, id: k}))
+            .filter(b => b.namaSiswa && b.namaSiswa.toLowerCase().includes(nama.toLowerCase()))
+        : [];
+      callback(list);
+    });
+  };
+
+  console.log('Firebase berhasil terhubung!');
+</script>
+
 <style>
 :root {
   --sage: #5B8C5A;
@@ -29,629 +94,245 @@
   --shadow: 0 4px 20px rgba(0,0,0,0.09);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.13);
   --r: 14px;
-  --r-sm: 9px;
 }
-
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;overflow-x:hidden}
 
-/* ===== PAGES ===== */
 .page{display:none;min-height:100vh;animation:fadeIn .35s ease}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
-/* ===== LOGIN PAGE ===== */
-#page-login{
-  display:none;
-  min-height:100vh;
-  background: linear-gradient(135deg, var(--sage-dark) 0%, #3D6B3C 50%, #1A3319 100%);
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  position:relative;
-  overflow:hidden;
-}
+/* LOGIN */
+#page-login{display:none;min-height:100vh;background:linear-gradient(135deg,var(--sage-dark) 0%,#3D6B3C 50%,#1A3319 100%);align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden}
 #page-login.active{display:flex}
+#page-login::before{content:'';position:fixed;top:-100px;right:-100px;width:500px;height:500px;background:radial-gradient(circle,rgba(255,255,255,0.06) 0%,transparent 70%);border-radius:50%}
+#page-login::after{content:'';position:fixed;bottom:-150px;left:-100px;width:600px;height:600px;background:radial-gradient(circle,rgba(201,125,78,0.15) 0%,transparent 70%);border-radius:50%}
+.login-box{background:var(--warm);border-radius:24px;padding:48px 44px;width:100%;max-width:460px;box-shadow:var(--shadow-lg);position:relative;z-index:1}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.login-logo .logo-icon{width:44px;height:44px;background:var(--sage);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.login-logo span{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:var(--sage-dark)}
+.login-box h2{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--sage-dark);margin-bottom:6px}
+.login-box p{color:var(--text-2);font-size:0.9rem;margin-bottom:28px}
+.role-tabs{display:flex;gap:8px;margin-bottom:24px;background:var(--cream);border-radius:10px;padding:4px}
+.role-tab{flex:1;padding:9px;text-align:center;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;color:var(--text-3);transition:all .2s}
+.role-tab.active{background:white;color:var(--sage-dark);box-shadow:var(--shadow-sm)}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:7px}
+.form-group input{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:10px;font-size:0.9rem;font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:var(--text);transition:border-color .2s;outline:none}
+.form-group input:focus{border-color:var(--sage);background:white}
+.login-hint{background:var(--sage-pale);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:0.8rem;color:var(--sage-dark);line-height:1.6}
+.login-hint strong{display:block;margin-bottom:4px}
+.btn-login{width:100%;padding:14px;background:var(--sage);color:white;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .2s}
+.btn-login:hover{background:var(--sage-dark);transform:translateY(-1px)}
 
-#page-login::before{
-  content:'';position:absolute;top:-100px;right:-100px;
-  width:500px;height:500px;
-  background:radial-gradient(circle,rgba(255,255,255,0.06) 0%,transparent 70%);
-  border-radius:50%;
-}
-#page-login::after{
-  content:'';position:absolute;bottom:-150px;left:-100px;
-  width:600px;height:600px;
-  background:radial-gradient(circle,rgba(201,125,78,0.15) 0%,transparent 70%);
-  border-radius:50%;
-}
+/* NAVBAR */
+.navbar{position:sticky;top:0;z-index:100;background:rgba(248,245,240,0.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between}
+.nav-left{display:flex;align-items:center;gap:28px}
+.nav-brand{display:flex;align-items:center;gap:10px;cursor:pointer}
+.nav-brand .nb-icon{width:34px;height:34px;background:var(--sage);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-brand span{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:var(--sage-dark)}
+.nav-menu{display:flex;gap:4px;list-style:none}
+.nav-menu a{padding:6px 14px;border-radius:7px;text-decoration:none;font-size:0.85rem;font-weight:500;color:var(--text-2);transition:all .15s;cursor:pointer}
+.nav-menu a:hover,.nav-menu a.active{background:var(--sage-pale);color:var(--sage-dark);font-weight:600}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-user{display:flex;align-items:center;gap:9px;padding:5px 12px 5px 5px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer}
+.user-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-user .user-name{font-size:0.82rem;font-weight:600}
+.nav-user .user-role{font-size:0.7rem;color:var(--text-3)}
+.btn-logout{padding:7px 14px;border-radius:8px;background:var(--red-light);color:var(--red);border:none;font-size:0.8rem;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .15s}
+.btn-logout:hover{background:var(--red);color:white}
 
-.login-box{
-  background:var(--warm);
-  border-radius:24px;
-  padding:48px 44px;
-  width:100%;max-width:460px;
-  box-shadow:var(--shadow-lg);
-  position:relative;z-index:1;
-}
+/* LAYOUT */
+.app-layout{display:flex;min-height:calc(100vh - 64px)}
+.sidebar{width:240px;flex-shrink:0;background:var(--warm);border-right:1px solid var(--border);padding:20px 14px;position:sticky;top:64px;height:calc(100vh - 64px);overflow-y:auto}
+.sidebar-section{margin-bottom:24px}
+.sidebar-label{font-size:0.68rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-3);padding:0 10px;margin-bottom:6px}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;cursor:pointer;transition:all .15s;font-size:0.85rem;font-weight:500;color:var(--text-2);margin-bottom:2px}
+.sidebar-item:hover{background:var(--cream)}
+.sidebar-item.active{background:var(--sage-pale);color:var(--sage-dark);font-weight:600}
+.sidebar-item .si-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-badge{margin-left:auto;background:var(--accent);color:white;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px}
+.main-content{flex:1;padding:28px;overflow-y:auto}
 
-.login-logo{
-  display:flex;align-items:center;gap:12px;
-  margin-bottom:32px;
-}
-.login-logo .logo-icon{
-  width:44px;height:44px;
-  background:var(--sage);
-  border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;
-}
-.login-logo span{
-  font-family:'Playfair Display',serif;
-  font-size:1.6rem;font-weight:700;
-  color:var(--sage-dark);
-}
+/* CONTENT */
+.content-header{margin-bottom:24px}
+.content-header h1{font-family:'Playfair Display',serif;font-size:1.7rem;color:var(--sage-dark);margin-bottom:4px}
+.content-header p{color:var(--text-2);font-size:0.88rem}
 
-.login-box h2{
-  font-family:'Playfair Display',serif;
-  font-size:1.7rem;color:var(--sage-dark);
-  margin-bottom:6px;
-}
-.login-box p{color:var(--text-2);font-size:0.9rem;margin-bottom:28px;}
+/* CARDS */
+.card{background:var(--warm);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.card-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-header h3{font-size:0.95rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-body{padding:22px}
 
-.role-tabs{
-  display:flex;gap:8px;margin-bottom:24px;
-  background:var(--cream);border-radius:10px;padding:4px;
-}
-.role-tab{
-  flex:1;padding:9px;text-align:center;
-  border-radius:8px;cursor:pointer;
-  font-size:0.85rem;font-weight:600;
-  color:var(--text-3);transition:all .2s;
-}
-.role-tab.active{background:white;color:var(--sage-dark);box-shadow:var(--shadow-sm);}
+/* STATS */
+.stats-row{display:grid;gap:16px;margin-bottom:24px}
+.stat-card{background:var(--warm);border-radius:var(--r);border:1px solid var(--border);padding:20px 22px;box-shadow:var(--shadow-sm);transition:transform .15s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-card .sc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px}
+.stat-card .sc-num{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--text);display:block;margin-bottom:2px}
+.stat-card .sc-label{font-size:0.8rem;color:var(--text-2);font-weight:500}
 
-.form-group{margin-bottom:16px;}
-.form-group label{
-  display:block;font-size:0.82rem;font-weight:600;
-  color:var(--text);margin-bottom:7px;
-}
-.form-group input{
-  width:100%;padding:12px 16px;
-  border:1.5px solid var(--border);border-radius:10px;
-  font-size:0.9rem;font-family:'Plus Jakarta Sans',sans-serif;
-  background:var(--cream);color:var(--text);
-  transition:border-color .2s;outline:none;
-}
-.form-group input:focus{border-color:var(--sage);background:white;}
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 
-.login-hint{
-  background:var(--sage-pale);border-radius:10px;
-  padding:12px 16px;margin-bottom:20px;
-  font-size:0.8rem;color:var(--sage-dark);line-height:1.6;
-}
-.login-hint strong{display:block;margin-bottom:4px;}
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{padding:11px 16px;text-align:left;font-size:0.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-3);background:var(--cream)}
+.data-table td{padding:13px 16px;font-size:0.85rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(91,140,90,0.03)}
 
-.btn-login{
-  width:100%;padding:14px;
-  background:var(--sage);color:white;
-  border:none;border-radius:10px;
-  font-size:0.95rem;font-weight:700;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  cursor:pointer;transition:all .2s;
-  letter-spacing:.3px;
-}
-.btn-login:hover{background:var(--sage-dark);transform:translateY(-1px);box-shadow:0 6px 20px rgba(91,140,90,0.3);}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:600}
+.badge-green{background:#E8F5E9;color:#2E7D32}
+.badge-yellow{background:var(--yellow-light);color:#7D6608}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-purple{background:#EDE7F6;color:#4527A0}
 
-/* ===== NAVBAR (shared) ===== */
-.navbar{
-  position:sticky;top:0;z-index:100;
-  background:rgba(248,245,240,0.94);
-  backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--border);
-  height:64px;padding:0 24px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.nav-left{display:flex;align-items:center;gap:28px;}
-.nav-brand{
-  display:flex;align-items:center;gap:10px;
-  text-decoration:none;cursor:pointer;
-}
-.nav-brand .nb-icon{
-  width:34px;height:34px;background:var(--sage);
-  border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;
-}
-.nav-brand span{
-  font-family:'Playfair Display',serif;
-  font-size:1.25rem;font-weight:700;color:var(--sage-dark);
-}
-.nav-menu{display:flex;gap:4px;list-style:none;}
-.nav-menu a{
-  padding:6px 14px;border-radius:7px;
-  text-decoration:none;font-size:0.85rem;font-weight:500;
-  color:var(--text-2);transition:all .15s;cursor:pointer;
-}
-.nav-menu a:hover{background:var(--sage-pale);color:var(--sage-dark);}
-.nav-menu a.active{background:var(--sage-pale);color:var(--sage-dark);font-weight:600;}
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:8px;border:none;font-size:0.83rem;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--sage);color:white}
+.btn-primary:hover{background:var(--sage-dark)}
+.btn-secondary{background:var(--cream);color:var(--text);border:1.5px solid var(--border)}
+.btn-secondary:hover{border-color:var(--sage)}
+.btn-danger{background:var(--red-light);color:var(--red)}
+.btn-danger:hover{background:var(--red);color:white}
+.btn-sm{padding:6px 12px;font-size:0.78rem}
 
-.nav-right{display:flex;align-items:center;gap:12px;}
-.nav-notif{
-  width:36px;height:36px;border-radius:9px;
-  border:1.5px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;font-size:15px;
-  position:relative;
-}
-.nav-notif:hover{background:var(--sage-pale);}
-.notif-dot{
-  position:absolute;top:6px;right:6px;
-  width:7px;height:7px;background:var(--accent);
-  border-radius:50%;border:1.5px solid var(--warm);
-}
-.nav-user{
-  display:flex;align-items:center;gap:9px;
-  padding:5px 12px 5px 5px;
-  border:1.5px solid var(--border);border-radius:10px;
-  cursor:pointer;transition:all .15s;
-}
-.nav-user:hover{background:var(--sage-pale);}
-.user-avatar{
-  width:32px;height:32px;border-radius:8px;
-  display:flex;align-items:center;justify-content:center;font-size:16px;
-}
-.nav-user .user-name{font-size:0.82rem;font-weight:600;color:var(--text);}
-.nav-user .user-role{font-size:0.7rem;color:var(--text-3);}
-.btn-logout{
-  padding:7px 14px;border-radius:8px;
-  background:var(--red-light);color:var(--red);
-  border:none;font-size:0.8rem;font-weight:600;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  cursor:pointer;transition:all .15s;
-}
-.btn-logout:hover{background:var(--red);color:white;}
+/* FORMS */
+.form-g{margin-bottom:16px}
+.form-g label{display:block;font-size:0.8rem;font-weight:600;color:var(--text);margin-bottom:7px}
+.form-g input,.form-g select,.form-g textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:9px;font-size:0.88rem;font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:var(--text);transition:border-color .2s;outline:none}
+.form-g input:focus,.form-g select:focus,.form-g textarea:focus{border-color:var(--sage);background:white}
+.form-g textarea{resize:vertical;min-height:80px}
 
-/* ===== LAYOUT ===== */
-.app-layout{display:flex;min-height:calc(100vh - 64px);}
+/* BOOKING STEPS */
+.booking-steps{display:flex;gap:8px;align-items:center;margin-bottom:28px}
+.b-step{display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:600;color:var(--text-3)}
+.b-step.active{color:var(--sage-dark)}
+.b-step.done{color:var(--sage)}
+.b-step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;background:var(--cream);color:var(--text-3);border:1.5px solid var(--border);flex-shrink:0}
+.b-step.active .b-step-num{background:var(--sage);color:white;border-color:var(--sage)}
+.b-step.done .b-step-num{background:var(--sage-pale);color:var(--sage);border-color:var(--sage-light)}
+.b-step-line{flex:1;height:1px;background:var(--border)}
 
-.sidebar{
-  width:240px;flex-shrink:0;
-  background:var(--warm);
-  border-right:1px solid var(--border);
-  padding:20px 14px;
-  position:sticky;top:64px;
-  height:calc(100vh - 64px);overflow-y:auto;
-}
+/* COUNSELOR PICKER */
+.counselor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.c-pick-card{border:1.5px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s}
+.c-pick-card:hover,.c-pick-card.selected{border-color:var(--sage);background:var(--sage-pale)}
+.c-pick-card .cpc-avatar{width:54px;height:54px;border-radius:14px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px}
+.c-pick-card .cpc-name{font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:3px}
+.c-pick-card .cpc-spec{font-size:0.72rem;color:var(--text-3)}
 
-.sidebar-section{margin-bottom:24px;}
-.sidebar-label{
-  font-size:0.68rem;font-weight:700;letter-spacing:.8px;
-  text-transform:uppercase;color:var(--text-3);
-  padding:0 10px;margin-bottom:6px;
-}
-.sidebar-item{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 10px;border-radius:9px;
-  cursor:pointer;transition:all .15s;
-  font-size:0.85rem;font-weight:500;color:var(--text-2);
-  margin-bottom:2px;
-}
-.sidebar-item:hover{background:var(--cream);}
-.sidebar-item.active{background:var(--sage-pale);color:var(--sage-dark);font-weight:600;}
-.sidebar-item .si-icon{font-size:16px;width:20px;text-align:center;}
-.sidebar-badge{
-  margin-left:auto;
-  background:var(--accent);color:white;
-  font-size:0.68rem;font-weight:700;
-  padding:2px 7px;border-radius:10px;
-}
+/* TYPE PICKER */
+.type-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.type-card{border:1.5px solid var(--border);border-radius:11px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s}
+.type-card:hover,.type-card.selected{border-color:var(--sage);background:var(--sage-pale)}
+.type-card .tc-icon{font-size:1.5rem;flex-shrink:0}
+.type-card .tc-label{font-size:0.85rem;font-weight:600;color:var(--text)}
+.type-card .tc-desc{font-size:0.73rem;color:var(--text-3)}
 
-.main-content{flex:1;padding:28px;overflow-y:auto;}
+/* CALENDAR */
+.cal-wrap{display:grid;grid-template-columns:1fr 190px;gap:20px}
+.cal-nav-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav-row span{font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;color:var(--sage-dark)}
+.cal-btn{width:30px;height:30px;border:1.5px solid var(--border);border-radius:7px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.85rem;transition:all .15s}
+.cal-btn:hover{border-color:var(--sage);background:var(--sage-pale)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-dl{text-align:center;font-size:0.68rem;font-weight:700;color:var(--text-3);padding:4px 0 8px;letter-spacing:.5px}
+.cal-d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:0.82rem;border-radius:8px;cursor:pointer;transition:all .15s;font-weight:500;position:relative}
+.cal-d:hover:not(.past):not(.empty){background:var(--accent-light)}
+.cal-d.today{background:var(--sage);color:white;font-weight:700}
+.cal-d.selected{background:var(--accent);color:white;font-weight:700}
+.cal-d.past{color:#CCC;cursor:default}
+.cal-d.empty{cursor:default}
+.cal-d.dot::after{content:'';position:absolute;bottom:3px;width:4px;height:4px;background:var(--sage);border-radius:50%}
+.cal-d.today.dot::after,.cal-d.selected.dot::after{background:white}
 
-/* ===== SECTION HEADER ===== */
-.content-header{margin-bottom:24px;}
-.content-header h1{
-  font-family:'Playfair Display',serif;
-  font-size:1.7rem;color:var(--sage-dark);margin-bottom:4px;
-}
-.content-header p{color:var(--text-2);font-size:0.88rem;}
+/* SLOTS */
+.slot-panel h4{font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:10px}
+.slot-list{display:flex;flex-direction:column;gap:7px}
+.slot-item{padding:9px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;font-weight:500;cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:center}
+.slot-item:hover:not(.full){border-color:var(--sage)}
+.slot-item.selected{border-color:var(--sage);background:var(--sage);color:white}
+.slot-item.full{opacity:.38;cursor:not-allowed}
+.slot-tag{font-size:0.68rem;font-weight:600;padding:2px 7px;border-radius:5px}
+.slot-tag.ok{background:#E8F5E9;color:#2E7D32}
+.slot-tag.no{background:var(--red-light);color:var(--red)}
+.slot-item.selected .slot-tag{background:rgba(255,255,255,.25);color:white}
 
-/* ===== CARDS ===== */
-.card{
-  background:var(--warm);border-radius:var(--r);
-  border:1px solid var(--border);
-  box-shadow:var(--shadow-sm);
-}
-.card-header{
-  padding:18px 22px;
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
-}
-.card-header h3{
-  font-size:0.95rem;font-weight:700;color:var(--text);
-  display:flex;align-items:center;gap:8px;
-}
-.card-body{padding:22px;}
+/* SUMMARY */
+.summary-card{background:linear-gradient(135deg,var(--sage-dark),#1E3D1D);border-radius:var(--r);padding:24px;color:white}
+.summary-card h3{font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:18px;opacity:.9}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:0.83rem}
+.sum-row:last-of-type{border-bottom:none}
+.sum-row span:first-child{opacity:.65}
+.sum-row span:last-child{font-weight:600}
+.btn-submit{width:100%;margin-top:18px;background:var(--accent);color:white;border:none;padding:13px;border-radius:10px;font-size:0.92rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .2s}
+.btn-submit:hover{background:#A8633A;transform:translateY(-1px)}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
-/* ===== STAT CARDS ===== */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
-.stat-card{
-  background:var(--warm);border-radius:var(--r);
-  border:1px solid var(--border);
-  padding:20px 22px;
-  box-shadow:var(--shadow-sm);
-  transition:transform .15s;
-}
-.stat-card:hover{transform:translateY(-2px);}
-.stat-card .sc-icon{
-  width:40px;height:40px;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;margin-bottom:12px;
-}
-.stat-card .sc-num{
-  font-family:'Playfair Display',serif;
-  font-size:2rem;font-weight:700;color:var(--text);
-  display:block;margin-bottom:2px;
-}
-.stat-card .sc-label{font-size:0.8rem;color:var(--text-2);font-weight:500;}
-.stat-card .sc-change{
-  font-size:0.75rem;margin-top:6px;font-weight:600;
-}
-.sc-change.up{color:#27AE60;}
-.sc-change.down{color:var(--red);}
+/* APPROVAL CARDS */
+.approval-card{background:var(--warm);border-radius:var(--r);border:1px solid var(--border);padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:10px;box-shadow:var(--shadow-sm);transition:transform .15s}
+.approval-card:hover{transform:translateX(3px)}
+.appr-date{background:var(--cream);border-radius:10px;padding:10px 12px;text-align:center;min-width:54px;flex-shrink:0}
+.appr-date .ad-day{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:var(--sage-dark);display:block}
+.appr-date .ad-mon{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-3)}
+.appr-info{flex:1}
+.appr-info h4{font-size:0.9rem;font-weight:700;margin-bottom:3px}
+.appr-info .appr-meta{font-size:0.78rem;color:var(--text-3);display:flex;gap:14px;flex-wrap:wrap}
+.appr-actions{display:flex;gap:8px;flex-shrink:0}
 
-/* ===== GRID LAYOUTS ===== */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
-.col-span-2{grid-column:span 2;}
+/* BAR CHART */
+.bar-chart{display:flex;flex-direction:column;gap:10px}
+.bar-row{display:flex;align-items:center;gap:12px}
+.bar-label{font-size:0.78rem;font-weight:600;color:var(--text-2);width:80px;flex-shrink:0}
+.bar-track{flex:1;height:10px;background:var(--cream);border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;transition:width .8s ease}
+.bar-val{font-size:0.78rem;font-weight:700;color:var(--text);width:28px;text-align:right;flex-shrink:0}
 
-/* ===== TABLE ===== */
-.data-table{width:100%;border-collapse:collapse;}
-.data-table th{
-  padding:11px 16px;text-align:left;
-  font-size:0.75rem;font-weight:700;letter-spacing:.4px;
-  text-transform:uppercase;color:var(--text-3);
-  background:var(--cream);
-}
-.data-table th:first-child{border-radius:8px 0 0 8px;}
-.data-table th:last-child{border-radius:0 8px 8px 0;}
-.data-table td{
-  padding:13px 16px;
-  font-size:0.85rem;border-bottom:1px solid var(--border);
-  vertical-align:middle;
-}
-.data-table tr:last-child td{border-bottom:none;}
-.data-table tr:hover td{background:rgba(91,140,90,0.03);}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s}
+.modal-bg.show{opacity:1;pointer-events:all}
+.modal-box{background:white;border-radius:20px;padding:36px;max-width:420px;width:100%;text-align:center;transform:scale(.92);transition:transform .3s}
+.modal-bg.show .modal-box{transform:scale(1)}
+.modal-icon{font-size:3.2rem;margin-bottom:14px}
+.modal-box h3{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--sage-dark);margin-bottom:8px}
+.modal-box p{color:var(--text-2);font-size:0.88rem;line-height:1.6;margin-bottom:22px}
 
-/* ===== BADGES ===== */
-.badge{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:4px 10px;border-radius:20px;
-  font-size:0.75rem;font-weight:600;
-}
-.badge-green{background:#E8F5E9;color:#2E7D32;}
-.badge-yellow{background:var(--yellow-light);color:#7D6608;}
-.badge-red{background:var(--red-light);color:var(--red);}
-.badge-blue{background:var(--blue-light);color:var(--blue);}
-.badge-purple{background:#EDE7F6;color:#4527A0;}
-.badge-gray{background:var(--cream);color:var(--text-2);}
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--sage-dark);color:white;padding:12px 20px;border-radius:11px;font-size:0.85rem;font-weight:600;box-shadow:var(--shadow-lg);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:8px}
+.toast.show{transform:translateY(0);opacity:1}
 
-/* ===== BUTTONS ===== */
-.btn{
-  padding:8px 16px;border-radius:8px;
-  border:none;font-size:0.83rem;font-weight:600;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  cursor:pointer;transition:all .15s;
-  display:inline-flex;align-items:center;gap:6px;
-}
-.btn-primary{background:var(--sage);color:white;}
-.btn-primary:hover{background:var(--sage-dark);}
-.btn-secondary{background:var(--cream);color:var(--text);border:1.5px solid var(--border);}
-.btn-secondary:hover{border-color:var(--sage);}
-.btn-accent{background:var(--accent);color:white;}
-.btn-accent:hover{background:#A8633A;}
-.btn-danger{background:var(--red-light);color:var(--red);}
-.btn-danger:hover{background:var(--red);color:white;}
-.btn-sm{padding:6px 12px;font-size:0.78rem;}
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--text-3);font-size:0.9rem}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--sage);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ===== FORMS ===== */
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:0;}
-.form-g{margin-bottom:16px;}
-.form-g label{
-  display:block;font-size:0.8rem;font-weight:600;
-  color:var(--text);margin-bottom:7px;
-}
-.form-g input,.form-g select,.form-g textarea{
-  width:100%;padding:11px 14px;
-  border:1.5px solid var(--border);border-radius:9px;
-  font-size:0.88rem;font-family:'Plus Jakarta Sans',sans-serif;
-  background:var(--cream);color:var(--text);
-  transition:border-color .2s;outline:none;
-}
-.form-g input:focus,.form-g select:focus,.form-g textarea:focus{
-  border-color:var(--sage);background:white;
-}
-.form-g textarea{resize:vertical;min-height:80px;}
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:48px 20px;color:var(--text-3)}
+.empty-state .es-icon{font-size:3rem;margin-bottom:12px;opacity:.5}
+.empty-state p{font-size:0.88rem}
 
-/* ===== BOOKING FORM SECTION ===== */
-.booking-steps{
-  display:flex;gap:8px;align-items:center;
-  margin-bottom:28px;
-}
-.b-step{
-  display:flex;align-items:center;gap:8px;
-  font-size:0.82rem;font-weight:600;
-  color:var(--text-3);
-}
-.b-step.active{color:var(--sage-dark);}
-.b-step.done{color:var(--sage);}
-.b-step-num{
-  width:26px;height:26px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:0.75rem;font-weight:700;
-  background:var(--cream);color:var(--text-3);
-  border:1.5px solid var(--border);
-  flex-shrink:0;
-}
-.b-step.active .b-step-num{background:var(--sage);color:white;border-color:var(--sage);}
-.b-step.done .b-step-num{background:var(--sage-pale);color:var(--sage);border-color:var(--sage-light);}
-.b-step-line{flex:1;height:1px;background:var(--border);}
-
-/* Counselor picker */
-.counselor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-.c-pick-card{
-  border:1.5px solid var(--border);border-radius:12px;
-  padding:16px;text-align:center;cursor:pointer;
-  transition:all .2s;
-}
-.c-pick-card:hover{border-color:var(--sage-light);background:var(--sage-pale);}
-.c-pick-card.selected{border-color:var(--sage);background:var(--sage-pale);}
-.c-pick-card .cpc-avatar{
-  width:54px;height:54px;border-radius:14px;
-  margin:0 auto 10px;display:flex;align-items:center;
-  justify-content:center;font-size:26px;
-}
-.c-pick-card .cpc-name{font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:3px;}
-.c-pick-card .cpc-spec{font-size:0.72rem;color:var(--text-3);}
-.c-pick-card .cpc-avail{
-  margin-top:8px;font-size:0.72rem;font-weight:600;
-  color:var(--sage);
-}
-
-/* Type picker */
-.type-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
-.type-card{
-  border:1.5px solid var(--border);border-radius:11px;
-  padding:14px 16px;cursor:pointer;
-  display:flex;align-items:center;gap:12px;
-  transition:all .15s;
-}
-.type-card:hover{border-color:var(--sage-light);}
-.type-card.selected{border-color:var(--sage);background:var(--sage-pale);}
-.type-card .tc-icon{font-size:1.5rem;flex-shrink:0;}
-.type-card .tc-label{font-size:0.85rem;font-weight:600;color:var(--text);}
-.type-card .tc-desc{font-size:0.73rem;color:var(--text-3);}
-
-/* Calendar */
-.cal-wrap{display:grid;grid-template-columns:1fr 190px;gap:20px;}
-.cal-nav-row{
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:14px;
-}
-.cal-nav-row span{
-  font-family:'Playfair Display',serif;
-  font-size:1rem;font-weight:600;color:var(--sage-dark);
-}
-.cal-btn{
-  width:30px;height:30px;
-  border:1.5px solid var(--border);border-radius:7px;
-  background:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  font-size:0.85rem;transition:all .15s;
-}
-.cal-btn:hover{border-color:var(--sage);background:var(--sage-pale);}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
-.cal-dl{
-  text-align:center;font-size:0.68rem;font-weight:700;
-  color:var(--text-3);padding:4px 0 8px;letter-spacing:.5px;
-}
-.cal-d{
-  aspect-ratio:1;display:flex;align-items:center;justify-content:center;
-  font-size:0.82rem;border-radius:8px;cursor:pointer;
-  transition:all .15s;font-weight:500;position:relative;
-}
-.cal-d:hover:not(.past):not(.empty){background:var(--accent-light);}
-.cal-d.today{background:var(--sage);color:white;font-weight:700;}
-.cal-d.selected{background:var(--accent);color:white;font-weight:700;}
-.cal-d.past{color:#CCC;cursor:default;}
-.cal-d.empty{cursor:default;}
-.cal-d.dot::after{
-  content:'';position:absolute;bottom:3px;
-  width:4px;height:4px;background:var(--sage);border-radius:50%;
-}
-.cal-d.today.dot::after,.cal-d.selected.dot::after{background:white;}
-
-.slot-panel h4{
-  font-size:0.8rem;font-weight:700;color:var(--text);
-  margin-bottom:10px;letter-spacing:.3px;
-}
-.slot-list{display:flex;flex-direction:column;gap:7px;}
-.slot-item{
-  padding:9px 13px;border:1.5px solid var(--border);
-  border-radius:8px;font-size:0.82rem;font-weight:500;
-  cursor:pointer;transition:all .15s;
-  display:flex;justify-content:space-between;align-items:center;
-}
-.slot-item:hover:not(.full){border-color:var(--sage);}
-.slot-item.selected{border-color:var(--sage);background:var(--sage);color:white;}
-.slot-item.full{opacity:.38;cursor:not-allowed;}
-.slot-tag{
-  font-size:0.68rem;font-weight:600;
-  padding:2px 7px;border-radius:5px;
-}
-.slot-tag.ok{background:#E8F5E9;color:#2E7D32;}
-.slot-tag.no{background:var(--red-light);color:var(--red);}
-.slot-item.selected .slot-tag{background:rgba(255,255,255,.25);color:white;}
-
-/* Summary */
-.summary-card{
-  background:linear-gradient(135deg,var(--sage-dark),#1E3D1D);
-  border-radius:var(--r);padding:24px;color:white;
-}
-.summary-card h3{
-  font-family:'Playfair Display',serif;
-  font-size:1.05rem;margin-bottom:18px;opacity:.9;
-}
-.sum-row{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:9px 0;border-bottom:1px solid rgba(255,255,255,.1);
-  font-size:0.83rem;
-}
-.sum-row:last-of-type{border-bottom:none;}
-.sum-row span:first-child{opacity:.65;}
-.sum-row span:last-child{font-weight:600;}
-.btn-submit{
-  width:100%;margin-top:18px;
-  background:var(--accent);color:white;
-  border:none;padding:13px;border-radius:10px;
-  font-size:0.92rem;font-weight:700;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  cursor:pointer;transition:all .2s;
-}
-.btn-submit:hover{background:#A8633A;transform:translateY(-1px);}
-
-/* ===== DASHBOARD GURU ===== */
-.approval-card{
-  background:var(--warm);border-radius:var(--r);
-  border:1px solid var(--border);padding:18px 20px;
-  display:flex;align-items:center;gap:16px;
-  margin-bottom:10px;transition:transform .15s;
-  box-shadow:var(--shadow-sm);
-}
-.approval-card:hover{transform:translateX(3px);}
-.appr-date{
-  background:var(--cream);border-radius:10px;
-  padding:10px 12px;text-align:center;min-width:54px;flex-shrink:0;
-}
-.appr-date .ad-day{
-  font-family:'Playfair Display',serif;
-  font-size:1.4rem;font-weight:700;color:var(--sage-dark);display:block;
-}
-.appr-date .ad-mon{
-  font-size:0.68rem;font-weight:700;
-  text-transform:uppercase;letter-spacing:.4px;color:var(--text-3);
-}
-.appr-info{flex:1;}
-.appr-info h4{font-size:0.9rem;font-weight:700;margin-bottom:3px;}
-.appr-info .appr-meta{
-  font-size:0.78rem;color:var(--text-3);
-  display:flex;gap:14px;flex-wrap:wrap;
-}
-.appr-actions{display:flex;gap:8px;flex-shrink:0;}
-
-/* Chart bar simple */
-.bar-chart{display:flex;flex-direction:column;gap:10px;}
-.bar-row{display:flex;align-items:center;gap:12px;}
-.bar-label{font-size:0.78rem;font-weight:600;color:var(--text-2);width:80px;flex-shrink:0;}
-.bar-track{flex:1;height:10px;background:var(--cream);border-radius:5px;overflow:hidden;}
-.bar-fill{height:100%;border-radius:5px;transition:width .8s ease;}
-.bar-val{font-size:0.78rem;font-weight:700;color:var(--text);width:28px;text-align:right;flex-shrink:0;}
-
-/* Profile cards */
-.profile-card{
-  background:var(--warm);border-radius:var(--r);
-  border:1px solid var(--border);padding:24px;
-  text-align:center;
-}
-.profile-avatar{
-  width:80px;height:80px;border-radius:20px;
-  margin:0 auto 14px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:36px;
-}
-.profile-name{
-  font-family:'Playfair Display',serif;
-  font-size:1.2rem;font-weight:600;color:var(--sage-dark);margin-bottom:4px;
-}
-.profile-role{font-size:0.83rem;color:var(--text-3);margin-bottom:16px;}
-.profile-stats{
-  display:flex;justify-content:center;gap:24px;
-  padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
-  margin-bottom:16px;
-}
-.ps-item{text-align:center;}
-.ps-num{
-  font-family:'Playfair Display',serif;
-  font-size:1.3rem;font-weight:700;color:var(--sage-dark);display:block;
-}
-.ps-lab{font-size:0.72rem;color:var(--text-3);}
-
-/* Notif items */
-.notif-list{display:flex;flex-direction:column;gap:0;}
-.notif-item{
-  display:flex;align-items:flex-start;gap:12px;
-  padding:14px 0;border-bottom:1px solid var(--border);
-}
-.notif-item:last-child{border-bottom:none;}
-.notif-ic{
-  width:34px;height:34px;border-radius:9px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:15px;flex-shrink:0;
-}
-.notif-body h4{font-size:0.85rem;font-weight:600;margin-bottom:2px;}
-.notif-body p{font-size:0.78rem;color:var(--text-3);}
-.notif-time{margin-left:auto;font-size:0.72rem;color:var(--text-3);flex-shrink:0;}
-
-/* Modal */
-.modal-bg{
-  position:fixed;inset:0;background:rgba(0,0,0,.48);
-  z-index:999;display:flex;align-items:center;justify-content:center;
-  padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;
-}
-.modal-bg.show{opacity:1;pointer-events:all;}
-.modal-box{
-  background:white;border-radius:20px;padding:36px;
-  max-width:420px;width:100%;text-align:center;
-  transform:scale(.92);transition:transform .3s;
-}
-.modal-bg.show .modal-box{transform:scale(1);}
-.modal-icon{font-size:3.2rem;margin-bottom:14px;}
-.modal-box h3{
-  font-family:'Playfair Display',serif;
-  font-size:1.4rem;color:var(--sage-dark);margin-bottom:8px;
-}
-.modal-box p{color:var(--text-2);font-size:0.88rem;line-height:1.6;margin-bottom:22px;}
-
-/* Toast */
-.toast{
-  position:fixed;bottom:24px;right:24px;
-  background:var(--sage-dark);color:white;
-  padding:12px 20px;border-radius:11px;
-  font-size:0.85rem;font-weight:600;
-  box-shadow:var(--shadow-lg);z-index:9999;
-  transform:translateY(80px);opacity:0;
-  transition:all .3s;display:flex;align-items:center;gap:8px;
-}
-.toast.show{transform:translateY(0);opacity:1;}
-
-/* Responsive */
 @media(max-width:900px){
-  .stats-row{grid-template-columns:1fr 1fr;}
-  .counselor-grid{grid-template-columns:1fr 1fr;}
-  .cal-wrap{grid-template-columns:1fr;}
-  .sidebar{display:none;}
+  .counselor-grid{grid-template-columns:1fr 1fr}
+  .cal-wrap{grid-template-columns:1fr}
+  .sidebar{display:none}
 }
 @media(max-width:600px){
-  .main-content{padding:16px;}
-  .grid-2{grid-template-columns:1fr;}
-  .form-row{grid-template-columns:1fr;}
-  .stats-row{grid-template-columns:1fr 1fr;}
-  .type-grid{grid-template-columns:1fr;}
+  .main-content{padding:16px}
+  .grid-2{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .type-grid{grid-template-columns:1fr}
+  .login-box{padding:32px 24px}
 }
 </style>
 </head>
 <body>
 
-<!-- ============ LOGIN PAGE ============ -->
+<!-- ===== LOGIN ===== -->
 <div id="page-login" class="page active">
   <div class="login-box">
     <div class="login-logo">
@@ -660,35 +341,31 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
     </div>
     <h2>Selamat Datang</h2>
     <p>Masuk untuk mengakses layanan konseling sekolah</p>
-    
     <div class="role-tabs">
       <div class="role-tab active" onclick="setRole('siswa',this)">👤 Siswa</div>
       <div class="role-tab" onclick="setRole('guru',this)">👩‍🏫 Guru BK</div>
-      <div class="role-tab" onclick="setRole('admin',this)">⚙️ Admin</div>
     </div>
-
     <div class="login-hint">
       <strong>🔑 Akun Demo:</strong>
       <span id="hint-text">Siswa: <b>siswa@sekolah.id</b> / pass: <b>siswa123</b></span>
     </div>
-
     <div class="form-group">
-      <label>Email Sekolah</label>
-      <input type="email" id="login-email" placeholder="nama@sekolah.id" />
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="nama@sekolah.id"/>
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="login-pass" placeholder="••••••••" />
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
     </div>
     <button class="btn-login" onclick="doLogin()">Masuk →</button>
   </div>
 </div>
 
-<!-- ============ SISWA PAGE ============ -->
+<!-- ===== SISWA PAGE ===== -->
 <div id="page-siswa" class="page">
   <nav class="navbar">
     <div class="nav-left">
-      <div class="nav-brand" onclick="showPage('siswa')">
+      <div class="nav-brand" onclick="showSiswaSection('dashboard')">
         <div class="nb-icon">🌿</div>
         <span>KonselingKu</span>
       </div>
@@ -700,14 +377,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       </ul>
     </div>
     <div class="nav-right">
-      <div class="nav-notif" title="Notifikasi">
-        🔔<span class="notif-dot"></span>
-      </div>
       <div class="nav-user">
         <div class="user-avatar" style="background:#EBF3EB">😊</div>
         <div>
-          <div class="user-name">Rizky Firmansyah</div>
-          <div class="user-role">XI IPA 2 · Siswa</div>
+          <div class="user-name" id="siswa-nama-nav">Siswa</div>
+          <div class="user-role" id="siswa-kelas-nav">Kelas</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">Keluar</button>
@@ -717,28 +391,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
     <div class="sidebar">
       <div class="sidebar-section">
         <div class="sidebar-label">Menu</div>
-        <div class="sidebar-item active" onclick="showSiswaSection('dashboard',this)">
-          <span class="si-icon">🏠</span> Dashboard
-        </div>
-        <div class="sidebar-item" onclick="showSiswaSection('booking',this)">
-          <span class="si-icon">📅</span> Buat Jadwal
-        </div>
-        <div class="sidebar-item" onclick="showSiswaSection('jadwal',this)">
-          <span class="si-icon">📋</span> Jadwal Saya
-          <span class="sidebar-badge">2</span>
-        </div>
-        <div class="sidebar-item" onclick="showSiswaSection('riwayat',this)">
-          <span class="si-icon">📂</span> Riwayat
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-label">Info</div>
-        <div class="sidebar-item" onclick="showSiswaSection('profil',this)">
-          <span class="si-icon">👤</span> Profil Saya
-        </div>
-        <div class="sidebar-item">
-          <span class="si-icon">❓</span> Bantuan
-        </div>
+        <div class="sidebar-item active" onclick="showSiswaSection('dashboard',this)"><span class="si-icon">🏠</span>Dashboard</div>
+        <div class="sidebar-item" onclick="showSiswaSection('booking',this)"><span class="si-icon">📅</span>Buat Jadwal</div>
+        <div class="sidebar-item" onclick="showSiswaSection('jadwal',this)"><span class="si-icon">📋</span>Jadwal Saya</div>
+        <div class="sidebar-item" onclick="showSiswaSection('riwayat',this)"><span class="si-icon">📂</span>Riwayat</div>
       </div>
     </div>
     <div class="main-content">
@@ -746,112 +402,42 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <!-- DASHBOARD SISWA -->
       <div id="ss-dashboard">
         <div class="content-header">
-          <h1>Selamat Datang, Rizky 👋</h1>
+          <h1 id="siswa-welcome">Selamat Datang 👋</h1>
           <p>Pantau dan kelola jadwal konselingmu di sini</p>
         </div>
         <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card">
             <div class="sc-icon" style="background:#EBF3EB">📅</div>
-            <span class="sc-num">2</span>
+            <span class="sc-num" id="stat-aktif">0</span>
             <div class="sc-label">Jadwal Aktif</div>
-            <div class="sc-change up">↑ 1 minggu ini</div>
           </div>
           <div class="stat-card">
             <div class="sc-icon" style="background:var(--accent-light)">✅</div>
-            <span class="sc-num">7</span>
+            <span class="sc-num" id="stat-selesai">0</span>
             <div class="sc-label">Sesi Selesai</div>
-            <div class="sc-change up">↑ Semester ini</div>
           </div>
           <div class="stat-card">
-            <div class="sc-icon" style="background:var(--blue-light)">⭐</div>
-            <span class="sc-num">4.8</span>
-            <div class="sc-label">Rating Rata-rata</div>
-            <div class="sc-change up">↑ Bagus!</div>
+            <div class="sc-icon" style="background:var(--yellow-light)">⏳</div>
+            <span class="sc-num" id="stat-menunggu">0</span>
+            <div class="sc-label">Menunggu Konfirmasi</div>
           </div>
         </div>
-
-        <div class="grid-2">
-          <!-- Upcoming -->
-          <div class="card">
-            <div class="card-header">
-              <h3>📅 Jadwal Mendatang</h3>
-              <button class="btn btn-sm btn-primary" onclick="showSiswaSection('booking')">+ Buat Baru</button>
-            </div>
-            <div class="card-body" style="padding:14px 18px;">
-              <div class="approval-card">
-                <div class="appr-date">
-                  <span class="ad-day">24</span>
-                  <span class="ad-mon">Feb</span>
-                </div>
-                <div class="appr-info">
-                  <h4>Konseling Individu – Akademik</h4>
-                  <div class="appr-meta">
-                    <span>👩‍🏫 Ibu Sari Dewi</span>
-                    <span>⏰ 09.00 WIB</span>
-                  </div>
-                </div>
-                <span class="badge badge-green">✓ Konfirmasi</span>
-              </div>
-              <div class="approval-card">
-                <div class="appr-date">
-                  <span class="ad-day">27</span>
-                  <span class="ad-mon">Feb</span>
-                </div>
-                <div class="appr-info">
-                  <h4>Konseling Kelompok – Sosial</h4>
-                  <div class="appr-meta">
-                    <span>👨‍🏫 Bpk. Hendra</span>
-                    <span>⏰ 13.00 WIB</span>
-                  </div>
-                </div>
-                <span class="badge badge-yellow">⏳ Menunggu</span>
-              </div>
-            </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>📅 Jadwal Mendatang</h3>
+            <button class="btn btn-sm btn-primary" onclick="showSiswaSection('booking')">+ Buat Baru</button>
           </div>
-
-          <!-- Notifikasi -->
-          <div class="card">
-            <div class="card-header">
-              <h3>🔔 Notifikasi</h3>
-              <span class="badge badge-blue">3 baru</span>
-            </div>
-            <div class="card-body" style="padding:8px 18px;">
-              <div class="notif-list">
-                <div class="notif-item">
-                  <div class="notif-ic" style="background:#E8F5E9">✅</div>
-                  <div class="notif-body">
-                    <h4>Jadwal Dikonfirmasi</h4>
-                    <p>Sesi 24 Feb telah dikonfirmasi Ibu Sari</p>
-                  </div>
-                  <span class="notif-time">2j lalu</span>
-                </div>
-                <div class="notif-item">
-                  <div class="notif-ic" style="background:var(--yellow-light)">⏰</div>
-                  <div class="notif-body">
-                    <h4>Pengingat Besok</h4>
-                    <p>Jadwal konseling Senin 24 Feb, 09.00</p>
-                  </div>
-                  <span class="notif-time">5j lalu</span>
-                </div>
-                <div class="notif-item">
-                  <div class="notif-ic" style="background:var(--accent-light)">💬</div>
-                  <div class="notif-body">
-                    <h4>Pesan dari Guru BK</h4>
-                    <p>Ibu Sari Dewi: "Sampai jumpa besok ya!"</p>
-                  </div>
-                  <span class="notif-time">1h lalu</span>
-                </div>
-              </div>
-            </div>
+          <div class="card-body" id="dashboard-jadwal-list">
+            <div class="loading"><div class="spinner"></div>Memuat data...</div>
           </div>
         </div>
       </div>
 
-      <!-- BOOKING SECTION -->
+      <!-- BOOKING -->
       <div id="ss-booking" style="display:none">
         <div class="content-header">
           <h1>Buat Jadwal Konseling</h1>
-          <p>Isi formulir berikut dengan lengkap</p>
+          <p>Isi formulir dengan lengkap untuk membuat janji konseling</p>
         </div>
         <div class="booking-steps">
           <div class="b-step active" id="bstep1"><div class="b-step-num">1</div>Jenis & Konselor</div>
@@ -863,7 +449,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
 
         <!-- Step 1 -->
         <div id="booking-step1">
-          <div class="card" style="margin-bottom:16px;">
+          <div class="card" style="margin-bottom:16px">
             <div class="card-header"><h3>🎯 Jenis Konseling</h3></div>
             <div class="card-body">
               <div class="type-grid">
@@ -886,7 +472,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
               </div>
             </div>
           </div>
-          <div class="card" style="margin-bottom:16px;">
+          <div class="card" style="margin-bottom:16px">
             <div class="card-header"><h3>👩‍🏫 Pilih Guru BK</h3></div>
             <div class="card-body">
               <div class="counselor-grid">
@@ -894,19 +480,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
                   <div class="cpc-avatar" style="background:linear-gradient(135deg,#A8C5AD,#5B8C5A)">👩‍🏫</div>
                   <div class="cpc-name">Ibu Sari Dewi</div>
                   <div class="cpc-spec">Akademik & Karir</div>
-                  <div class="cpc-avail">● 8 slot tersedia</div>
                 </div>
                 <div class="c-pick-card" onclick="selectCounselor(this,'Bpk. Hendra Pratama, S.Pd')">
                   <div class="cpc-avatar" style="background:linear-gradient(135deg,#F2E0D4,#C97D4E)">👨‍🏫</div>
                   <div class="cpc-name">Bpk. Hendra P.</div>
                   <div class="cpc-spec">Sosial & Emosi</div>
-                  <div class="cpc-avail">● 5 slot tersedia</div>
                 </div>
                 <div class="c-pick-card" onclick="selectCounselor(this,'Ibu Rina Marlina, S.Pd')">
                   <div class="cpc-avatar" style="background:linear-gradient(135deg,#E8EAF6,#9FA8DA)">👩‍🏫</div>
                   <div class="cpc-name">Ibu Rina M.</div>
                   <div class="cpc-spec">Pribadi & Keluarga</div>
-                  <div class="cpc-avail">● 6 slot tersedia</div>
                 </div>
               </div>
             </div>
@@ -918,7 +501,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
 
         <!-- Step 2 -->
         <div id="booking-step2" style="display:none">
-          <div class="card" style="margin-bottom:16px;">
+          <div class="card" style="margin-bottom:16px">
             <div class="card-header"><h3>📅 Pilih Tanggal & Waktu</h3></div>
             <div class="card-body">
               <div class="cal-wrap">
@@ -958,38 +541,51 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
               <div class="card-header"><h3>📝 Detail Tambahan</h3></div>
               <div class="card-body">
                 <div class="form-g">
+                  <label>Nama Lengkap *</label>
+                  <input id="input-nama" type="text" placeholder="Nama lengkap kamu"/>
+                </div>
+                <div class="form-g">
+                  <label>Kelas *</label>
+                  <select id="input-kelas">
+                    <option value="">Pilih kelas</option>
+                    <option>X IPA 1</option><option>X IPA 2</option>
+                    <option>X IPS 1</option><option>X IPS 2</option>
+                    <option>XI IPA 1</option><option>XI IPA 2</option>
+                    <option>XI IPS 1</option><option>XI IPS 2</option>
+                    <option>XII IPA 1</option><option>XII IPA 2</option>
+                    <option>XII IPS 1</option><option>XII IPS 2</option>
+                  </select>
+                </div>
+                <div class="form-g">
+                  <label>No. HP / WhatsApp *</label>
+                  <input id="input-hp" type="tel" placeholder="08xx-xxxx-xxxx"/>
+                </div>
+                <div class="form-g">
                   <label>Topik yang ingin dibicarakan</label>
-                  <textarea placeholder="Ceritakan hal yang ingin kamu diskusikan (bersifat rahasia)"></textarea>
+                  <textarea id="input-topik" placeholder="Ceritakan hal yang ingin kamu diskusikan (bersifat rahasia)"></textarea>
                 </div>
                 <div class="form-g">
-                  <label>Apakah ada yang perlu disiapkan Guru BK?</label>
-                  <textarea placeholder="Opsional — contoh: ingin membawa nilai rapor, dll." style="min-height:60px"></textarea>
-                </div>
-                <div class="form-g">
-                  <label>Metode Preferensi</label>
-                  <select>
+                  <label>Metode Konseling</label>
+                  <select id="input-metode">
                     <option>Tatap Muka di Ruang BK</option>
                     <option>Online via Google Meet</option>
-                    <option>Online via Zoom</option>
                   </select>
                 </div>
               </div>
             </div>
             <div>
-              <div class="summary-card" style="margin-bottom:16px;">
+              <div class="summary-card">
                 <h3>📋 Ringkasan</h3>
-                <div class="sum-row"><span>Siswa</span><span>Rizky Firmansyah</span></div>
-                <div class="sum-row"><span>Kelas</span><span>XI IPA 2</span></div>
                 <div class="sum-row"><span>Guru BK</span><span id="sum-konselor">Ibu Sari Dewi, S.Pd</span></div>
                 <div class="sum-row"><span>Jenis</span><span id="sum-jenis">Konseling Individu</span></div>
                 <div class="sum-row"><span>Tanggal</span><span id="sum-tgl">—</span></div>
                 <div class="sum-row"><span>Waktu</span><span id="sum-jam">—</span></div>
                 <div class="sum-row"><span>Lokasi</span><span>Ruang BK Lt. 2</span></div>
-                <button class="btn-submit" onclick="submitBooking()">✅ Kirim Permohonan</button>
+                <button class="btn-submit" id="btn-submit-booking" onclick="submitBooking()">✅ Kirim Permohonan</button>
               </div>
             </div>
           </div>
-          <div style="margin-top:8px">
+          <div style="margin-top:12px">
             <button class="btn btn-secondary" onclick="goStep(2)">← Kembali</button>
           </div>
         </div>
@@ -1002,23 +598,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
           <p>Daftar jadwal konseling aktif kamu</p>
         </div>
         <div class="card">
-          <div class="card-body" style="padding:16px 20px;">
-            <div class="approval-card">
-              <div class="appr-date"><span class="ad-day">24</span><span class="ad-mon">Feb</span></div>
-              <div class="appr-info">
-                <h4>Konseling Individu – Akademik</h4>
-                <div class="appr-meta"><span>👩‍🏫 Ibu Sari Dewi</span><span>⏰ 09.00 – 09.45 WIB</span><span>📍 Ruang BK Lt. 2</span></div>
-              </div>
-              <span class="badge badge-green">✓ Dikonfirmasi</span>
-            </div>
-            <div class="approval-card">
-              <div class="appr-date"><span class="ad-day">27</span><span class="ad-mon">Feb</span></div>
-              <div class="appr-info">
-                <h4>Konseling Kelompok – Sosial & Emosi</h4>
-                <div class="appr-meta"><span>👨‍🏫 Bpk. Hendra Pratama</span><span>⏰ 13.00 – 13.45 WIB</span><span>📍 Ruang BK Lt. 2</span></div>
-              </div>
-              <span class="badge badge-yellow">⏳ Menunggu</span>
-            </div>
+          <div class="card-body" id="jadwal-saya-list">
+            <div class="loading"><div class="spinner"></div>Memuat jadwal...</div>
           </div>
         </div>
       </div>
@@ -1027,52 +608,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <div id="ss-riwayat" style="display:none">
         <div class="content-header">
           <h1>Riwayat Konseling</h1>
-          <p>Semua sesi konseling yang telah kamu jalani</p>
+          <p>Semua sesi konseling kamu</p>
         </div>
         <div class="card">
-          <div class="card-body" style="padding:0 8px;">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th><th>Jenis</th><th>Guru BK</th><th>Durasi</th><th>Status</th><th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>15 Feb 2026</td><td>Individu</td><td>Ibu Sari Dewi</td><td>45 menit</td><td><span class="badge badge-purple">✔ Selesai</span></td><td><button class="btn btn-sm btn-secondary">Detail</button></td></tr>
-                <tr><td>8 Feb 2026</td><td>Kelompok</td><td>Bpk. Hendra</td><td>60 menit</td><td><span class="badge badge-purple">✔ Selesai</span></td><td><button class="btn btn-sm btn-secondary">Detail</button></td></tr>
-                <tr><td>1 Feb 2026</td><td>Akademik</td><td>Ibu Sari Dewi</td><td>45 menit</td><td><span class="badge badge-purple">✔ Selesai</span></td><td><button class="btn btn-sm btn-secondary">Detail</button></td></tr>
-                <tr><td>25 Jan 2026</td><td>Individu</td><td>Ibu Rina M.</td><td>45 menit</td><td><span class="badge badge-purple">✔ Selesai</span></td><td><button class="btn btn-sm btn-secondary">Detail</button></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- PROFIL -->
-      <div id="ss-profil" style="display:none">
-        <div class="content-header"><h1>Profil Saya</h1></div>
-        <div class="grid-2">
-          <div class="profile-card">
-            <div class="profile-avatar" style="background:#EBF3EB">😊</div>
-            <div class="profile-name">Rizky Firmansyah</div>
-            <div class="profile-role">Siswa · XI IPA 2</div>
-            <div class="profile-stats">
-              <div class="ps-item"><span class="ps-num">7</span><div class="ps-lab">Sesi Total</div></div>
-              <div class="ps-item"><span class="ps-num">4.8</span><div class="ps-lab">Rating</div></div>
-              <div class="ps-item"><span class="ps-num">2</span><div class="ps-lab">Aktif</div></div>
-            </div>
-            <button class="btn btn-secondary" style="width:100%">✏️ Edit Profil</button>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>📄 Informasi Akun</h3></div>
-            <div class="card-body">
-              <div class="form-g"><label>Nama Lengkap</label><input value="Rizky Firmansyah"/></div>
-              <div class="form-g"><label>Kelas</label><input value="XI IPA 2"/></div>
-              <div class="form-g"><label>NIS</label><input value="2024-0123"/></div>
-              <div class="form-g"><label>Email</label><input value="siswa@sekolah.id"/></div>
-              <div class="form-g"><label>No. HP</label><input value="0812-3456-7890"/></div>
-              <button class="btn btn-primary">💾 Simpan Perubahan</button>
-            </div>
+          <div class="card-body" style="padding:0 8px" id="riwayat-list">
+            <div class="loading"><div class="spinner"></div>Memuat riwayat...</div>
           </div>
         </div>
       </div>
@@ -1081,7 +621,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
   </div>
 </div>
 
-<!-- ============ GURU PAGE ============ -->
+<!-- ===== GURU PAGE ===== -->
 <div id="page-guru" class="page">
   <nav class="navbar">
     <div class="nav-left">
@@ -1090,17 +630,15 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
         <li><a class="active" onclick="showGuruSection('dashboard')">Dashboard</a></li>
         <li><a onclick="showGuruSection('permohonan')">Permohonan</a></li>
         <li><a onclick="showGuruSection('jadwal')">Jadwal</a></li>
-        <li><a onclick="showGuruSection('siswa')">Data Siswa</a></li>
         <li><a onclick="showGuruSection('laporan')">Laporan</a></li>
       </ul>
     </div>
     <div class="nav-right">
-      <div class="nav-notif" title="Notifikasi">🔔<span class="notif-dot"></span></div>
       <div class="nav-user">
         <div class="user-avatar" style="background:linear-gradient(135deg,#A8C5AD,#5B8C5A)">👩‍🏫</div>
         <div>
           <div class="user-name">Sari Dewi, S.Pd</div>
-          <div class="user-role">Guru BK · Aktif</div>
+          <div class="user-role">Guru BK</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">Keluar</button>
@@ -1111,15 +649,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <div class="sidebar-section">
         <div class="sidebar-label">Menu</div>
         <div class="sidebar-item active" onclick="showGuruSection('dashboard',this)"><span class="si-icon">🏠</span>Dashboard</div>
-        <div class="sidebar-item" onclick="showGuruSection('permohonan',this)"><span class="si-icon">📨</span>Permohonan<span class="sidebar-badge">3</span></div>
-        <div class="sidebar-item" onclick="showGuruSection('jadwal',this)"><span class="si-icon">📅</span>Jadwal Harian</div>
-        <div class="sidebar-item" onclick="showGuruSection('siswa',this)"><span class="si-icon">👥</span>Data Siswa</div>
+        <div class="sidebar-item" onclick="showGuruSection('permohonan',this)"><span class="si-icon">📨</span>Permohonan<span class="sidebar-badge" id="badge-permohonan">0</span></div>
+        <div class="sidebar-item" onclick="showGuruSection('jadwal',this)"><span class="si-icon">📅</span>Semua Jadwal</div>
         <div class="sidebar-item" onclick="showGuruSection('laporan',this)"><span class="si-icon">📊</span>Laporan</div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-label">Pengaturan</div>
-        <div class="sidebar-item" onclick="showGuruSection('availabilitas',this)"><span class="si-icon">🗓️</span>Availabilitas</div>
-        <div class="sidebar-item"><span class="si-icon">⚙️</span>Pengaturan</div>
       </div>
     </div>
     <div class="main-content">
@@ -1128,114 +660,37 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <div id="gs-dashboard">
         <div class="content-header">
           <h1>Dashboard Guru BK 👩‍🏫</h1>
-          <p>Senin, 24 Februari 2026 · Selamat pagi, Ibu Sari!</p>
+          <p>Semua data booking tersimpan secara real-time dari Firebase</p>
         </div>
-        <div class="stats-row">
+        <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
           <div class="stat-card">
             <div class="sc-icon" style="background:var(--yellow-light)">📨</div>
-            <span class="sc-num">3</span>
+            <span class="sc-num" id="gstat-menunggu">0</span>
             <div class="sc-label">Permohonan Baru</div>
-            <div class="sc-change up">↑ Perlu ditinjau</div>
           </div>
           <div class="stat-card">
-            <div class="sc-icon" style="background:#EBF3EB">📅</div>
-            <span class="sc-num">5</span>
-            <div class="sc-label">Jadwal Hari Ini</div>
-            <div class="sc-change up">2 sudah selesai</div>
+            <div class="sc-icon" style="background:#EBF3EB">✅</div>
+            <span class="sc-num" id="gstat-konfirmasi">0</span>
+            <div class="sc-label">Dikonfirmasi</div>
           </div>
           <div class="stat-card">
-            <div class="sc-icon" style="background:var(--blue-light)">👥</div>
-            <span class="sc-num">128</span>
-            <div class="sc-label">Total Siswa Dilayani</div>
-            <div class="sc-change up">↑ Semester ini</div>
+            <div class="sc-icon" style="background:var(--blue-light)">📋</div>
+            <span class="sc-num" id="gstat-total">0</span>
+            <div class="sc-label">Total Permohonan</div>
           </div>
           <div class="stat-card">
-            <div class="sc-icon" style="background:var(--accent-light)">⭐</div>
-            <span class="sc-num">4.9</span>
-            <div class="sc-label">Rating Rata-rata</div>
-            <div class="sc-change up">↑ Sangat baik!</div>
+            <div class="sc-icon" style="background:var(--accent-light)">✔️</div>
+            <span class="sc-num" id="gstat-selesai">0</span>
+            <div class="sc-label">Selesai</div>
           </div>
         </div>
-        <div class="grid-2">
-          <!-- Permohonan masuk -->
-          <div class="card">
-            <div class="card-header">
-              <h3>📨 Permohonan Masuk</h3>
-              <span class="badge badge-yellow">3 menunggu</span>
-            </div>
-            <div class="card-body" style="padding:14px 18px;">
-              <div class="approval-card">
-                <div class="appr-date"><span class="ad-day">25</span><span class="ad-mon">Feb</span></div>
-                <div class="appr-info">
-                  <h4>Amelia Putri · XI IPS 1</h4>
-                  <div class="appr-meta"><span>💬 Konseling Individu</span><span>⏰ 10.00 WIB</span></div>
-                </div>
-                <div class="appr-actions">
-                  <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓</button>
-                  <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗</button>
-                </div>
-              </div>
-              <div class="approval-card">
-                <div class="appr-date"><span class="ad-day">26</span><span class="ad-mon">Feb</span></div>
-                <div class="appr-info">
-                  <h4>Budi Santoso · X IPA 1</h4>
-                  <div class="appr-meta"><span>📚 Bimbingan Akademik</span><span>⏰ 08.00 WIB</span></div>
-                </div>
-                <div class="appr-actions">
-                  <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓</button>
-                  <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗</button>
-                </div>
-              </div>
-              <div class="approval-card">
-                <div class="appr-date"><span class="ad-day">27</span><span class="ad-mon">Feb</span></div>
-                <div class="appr-info">
-                  <h4>Rizky Firmansyah · XI IPA 2</h4>
-                  <div class="appr-meta"><span>👥 Konseling Kelompok</span><span>⏰ 13.00 WIB</span></div>
-                </div>
-                <div class="appr-actions">
-                  <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓</button>
-                  <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗</button>
-                </div>
-              </div>
-            </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>📨 Permohonan Terbaru</h3>
+            <button class="btn btn-sm btn-secondary" onclick="showGuruSection('permohonan')">Lihat Semua</button>
           </div>
-
-          <!-- Statistik -->
-          <div class="card">
-            <div class="card-header"><h3>📊 Statistik Bulan Ini</h3></div>
-            <div class="card-body">
-              <div class="bar-chart">
-                <div class="bar-row">
-                  <div class="bar-label">Individu</div>
-                  <div class="bar-track"><div class="bar-fill" style="width:78%;background:var(--sage)"></div></div>
-                  <div class="bar-val">42</div>
-                </div>
-                <div class="bar-row">
-                  <div class="bar-label">Kelompok</div>
-                  <div class="bar-track"><div class="bar-fill" style="width:45%;background:var(--blue)"></div></div>
-                  <div class="bar-val">24</div>
-                </div>
-                <div class="bar-row">
-                  <div class="bar-label">Akademik</div>
-                  <div class="bar-track"><div class="bar-fill" style="width:56%;background:var(--accent)"></div></div>
-                  <div class="bar-val">30</div>
-                </div>
-                <div class="bar-row">
-                  <div class="bar-label">Sosial</div>
-                  <div class="bar-track"><div class="bar-fill" style="width:30%;background:#9FA8DA"></div></div>
-                  <div class="bar-val">16</div>
-                </div>
-                <div class="bar-row">
-                  <div class="bar-label">Keluarga</div>
-                  <div class="bar-track"><div class="bar-fill" style="width:20%;background:#80CBC4"></div></div>
-                  <div class="bar-val">10</div>
-                </div>
-              </div>
-              <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:0.82rem;color:var(--text-2)">Total sesi bulan ini</span>
-                <span style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--sage-dark)">128</span>
-              </div>
-            </div>
+          <div class="card-body" id="guru-dashboard-list">
+            <div class="loading"><div class="spinner"></div>Memuat data...</div>
           </div>
         </div>
       </div>
@@ -1244,100 +699,32 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <div id="gs-permohonan" style="display:none">
         <div class="content-header">
           <h1>Permohonan Masuk</h1>
-          <p>Tinjau dan setujui permohonan konseling dari siswa</p>
-        </div>
-        <div class="card">
-          <div class="card-body" style="padding:0 8px;">
-            <table class="data-table">
-              <thead>
-                <tr><th>Siswa</th><th>Kelas</th><th>Jenis</th><th>Tanggal</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Amelia Putri</strong></td><td>XI IPS 1</td>
-                  <td><span class="badge badge-purple">Individu</span></td>
-                  <td>25 Feb 2026</td><td>10.00 WIB</td>
-                  <td><span class="badge badge-yellow">Menunggu</span></td>
-                  <td><div style="display:flex;gap:6px">
-                    <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓ Setujui</button>
-                    <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗ Tolak</button>
-                  </div></td>
-                </tr>
-                <tr>
-                  <td><strong>Budi Santoso</strong></td><td>X IPA 1</td>
-                  <td><span class="badge badge-blue">Akademik</span></td>
-                  <td>26 Feb 2026</td><td>08.00 WIB</td>
-                  <td><span class="badge badge-yellow">Menunggu</span></td>
-                  <td><div style="display:flex;gap:6px">
-                    <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓ Setujui</button>
-                    <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗ Tolak</button>
-                  </div></td>
-                </tr>
-                <tr>
-                  <td><strong>Rizky Firmansyah</strong></td><td>XI IPA 2</td>
-                  <td><span class="badge badge-green">Kelompok</span></td>
-                  <td>27 Feb 2026</td><td>13.00 WIB</td>
-                  <td><span class="badge badge-yellow">Menunggu</span></td>
-                  <td><div style="display:flex;gap:6px">
-                    <button class="btn btn-sm btn-primary" onclick="approveBooking(this)">✓ Setujui</button>
-                    <button class="btn btn-sm btn-danger" onclick="rejectBooking(this)">✗ Tolak</button>
-                  </div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- JADWAL HARIAN -->
-      <div id="gs-jadwal" style="display:none">
-        <div class="content-header">
-          <h1>Jadwal Harian</h1>
-          <p>Senin, 24 Februari 2026</p>
-        </div>
-        <div class="card">
-          <div class="card-body" style="padding:0 8px;">
-            <table class="data-table">
-              <thead>
-                <tr><th>Waktu</th><th>Siswa</th><th>Kelas</th><th>Jenis Konseling</th><th>Topik</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>07.30</td><td><strong>Dewi Rahayu</strong></td><td>XII IPA 1</td><td>Akademik</td><td>Pilihan PTN</td><td><span class="badge badge-purple">✔ Selesai</span></td></tr>
-                <tr><td>08.30</td><td><strong>Andi Setiawan</strong></td><td>X IPS 2</td><td>Individu</td><td>Motivasi belajar</td><td><span class="badge badge-purple">✔ Selesai</span></td></tr>
-                <tr><td>09.00</td><td><strong>Rizky Firmansyah</strong></td><td>XI IPA 2</td><td>Individu</td><td>Akademik</td><td><span class="badge badge-green">✓ Konfirmasi</span></td></tr>
-                <tr><td>10.00</td><td colspan="4" style="color:var(--text-3);font-style:italic">— Slot kosong —</td><td></td></tr>
-                <tr><td>13.00</td><td><strong>Nina Kartika</strong></td><td>XI IPS 1</td><td>Sosial</td><td>Pertemanan</td><td><span class="badge badge-green">✓ Konfirmasi</span></td></tr>
-                <tr><td>14.00</td><td><strong>Fajar Nugroho</strong></td><td>XII IPS 2</td><td>Individu</td><td>Karir</td><td><span class="badge badge-green">✓ Konfirmasi</span></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- DATA SISWA -->
-      <div id="gs-siswa" style="display:none">
-        <div class="content-header">
-          <h1>Data Siswa</h1>
-          <p>Daftar siswa yang pernah menggunakan layanan konseling</p>
+          <p>Semua data tersimpan & sinkron dari Firebase secara real-time</p>
         </div>
         <div class="card">
           <div class="card-header">
-            <h3>👥 Semua Siswa</h3>
-            <input style="padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;outline:none;font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);" placeholder="🔍 Cari siswa..."/>
+            <h3>📋 Daftar Permohonan</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm btn-secondary" onclick="filterStatus('')">Semua</button>
+              <button class="btn btn-sm btn-secondary" onclick="filterStatus('menunggu')">⏳ Menunggu</button>
+              <button class="btn btn-sm btn-secondary" onclick="filterStatus('dikonfirmasi')">✅ Konfirmasi</button>
+            </div>
           </div>
-          <div class="card-body" style="padding:0 8px;">
-            <table class="data-table">
-              <thead>
-                <tr><th>Nama</th><th>Kelas</th><th>Total Sesi</th><th>Terakhir</th><th>Status</th><th>Aksi</th></tr>
-              </thead>
-              <tbody>
-                <tr><td><strong>Rizky Firmansyah</strong></td><td>XI IPA 2</td><td>7</td><td>15 Feb 2026</td><td><span class="badge badge-green">Aktif</span></td><td><button class="btn btn-sm btn-secondary">Lihat</button></td></tr>
-                <tr><td><strong>Amelia Putri</strong></td><td>XI IPS 1</td><td>4</td><td>10 Feb 2026</td><td><span class="badge badge-green">Aktif</span></td><td><button class="btn btn-sm btn-secondary">Lihat</button></td></tr>
-                <tr><td><strong>Budi Santoso</strong></td><td>X IPA 1</td><td>2</td><td>28 Jan 2026</td><td><span class="badge badge-green">Aktif</span></td><td><button class="btn btn-sm btn-secondary">Lihat</button></td></tr>
-                <tr><td><strong>Dewi Rahayu</strong></td><td>XII IPA 1</td><td>10</td><td>24 Feb 2026</td><td><span class="badge badge-green">Aktif</span></td><td><button class="btn btn-sm btn-secondary">Lihat</button></td></tr>
-                <tr><td><strong>Andi Setiawan</strong></td><td>X IPS 2</td><td>3</td><td>24 Feb 2026</td><td><span class="badge badge-green">Aktif</span></td><td><button class="btn btn-sm btn-secondary">Lihat</button></td></tr>
-              </tbody>
-            </table>
+          <div class="card-body" style="padding:0 8px" id="permohonan-table-wrap">
+            <div class="loading"><div class="spinner"></div>Memuat permohonan...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEMUA JADWAL -->
+      <div id="gs-jadwal" style="display:none">
+        <div class="content-header">
+          <h1>Semua Jadwal</h1>
+          <p>Rekap seluruh jadwal konseling</p>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding:0 8px" id="semua-jadwal-wrap">
+            <div class="loading"><div class="spinner"></div>Memuat jadwal...</div>
           </div>
         </div>
       </div>
@@ -1346,77 +733,19 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
       <div id="gs-laporan" style="display:none">
         <div class="content-header">
           <h1>Laporan Konseling</h1>
-          <p>Rekap aktivitas layanan BK</p>
+          <p>Rekap data dari Firebase</p>
         </div>
-        <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
-          <div class="stat-card"><div class="sc-icon" style="background:#EBF3EB">📈</div><span class="sc-num">128</span><div class="sc-label">Sesi Bulan Ini</div><div class="sc-change up">↑ +23% dari bulan lalu</div></div>
-          <div class="stat-card"><div class="sc-icon" style="background:var(--blue-light)">👥</div><span class="sc-num">52</span><div class="sc-label">Siswa Unik</div><div class="sc-change up">↑ +8 siswa baru</div></div>
-          <div class="stat-card"><div class="sc-icon" style="background:var(--accent-light)">⭐</div><span class="sc-num">4.9</span><div class="sc-label">Kepuasan Rata-rata</div><div class="sc-change up">↑ Sangat baik</div></div>
+        <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+          <div class="stat-card"><div class="sc-icon" style="background:#EBF3EB">📈</div><span class="sc-num" id="lap-total">0</span><div class="sc-label">Total Permohonan</div></div>
+          <div class="stat-card"><div class="sc-icon" style="background:var(--blue-light)">✅</div><span class="sc-num" id="lap-konfirmasi">0</span><div class="sc-label">Dikonfirmasi</div></div>
+          <div class="stat-card"><div class="sc-icon" style="background:var(--accent-light)">⏳</div><span class="sc-num" id="lap-menunggu">0</span><div class="sc-label">Menunggu</div></div>
         </div>
         <div class="card">
           <div class="card-header">
-            <h3>📊 Rekap Bulanan</h3>
-            <button class="btn btn-sm btn-secondary">📥 Unduh PDF</button>
+            <h3>📊 Distribusi Jenis Konseling</h3>
           </div>
-          <div class="card-body" style="padding:0 8px;">
-            <table class="data-table">
-              <thead><tr><th>Bulan</th><th>Total Sesi</th><th>Individu</th><th>Kelompok</th><th>Akademik</th><th>Sosial</th><th>Rating</th></tr></thead>
-              <tbody>
-                <tr><td><strong>Feb 2026</strong></td><td>128</td><td>42</td><td>24</td><td>30</td><td>16</td><td>⭐ 4.9</td></tr>
-                <tr><td>Jan 2026</td><td>104</td><td>38</td><td>18</td><td>26</td><td>12</td><td>⭐ 4.8</td></tr>
-                <tr><td>Des 2025</td><td>95</td><td>32</td><td>20</td><td>28</td><td>10</td><td>⭐ 4.7</td></tr>
-                <tr><td>Nov 2025</td><td>112</td><td>40</td><td>22</td><td>24</td><td>14</td><td>⭐ 4.8</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- AVAILABILITAS -->
-      <div id="gs-availabilitas" style="display:none">
-        <div class="content-header">
-          <h1>Atur Availabilitas</h1>
-          <p>Tentukan hari dan jam kamu tersedia untuk konseling</p>
-        </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-header"><h3>📅 Jam Tersedia Mingguan</h3></div>
-            <div class="card-body">
-              <table class="data-table">
-                <thead><tr><th>Hari</th><th>Mulai</th><th>Selesai</th><th>Aktif</th></tr></thead>
-                <tbody>
-                  <tr><td>Senin</td><td><input type="time" value="07:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="15:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>✅</td></tr>
-                  <tr><td>Selasa</td><td><input type="time" value="07:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="15:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>✅</td></tr>
-                  <tr><td>Rabu</td><td><input type="time" value="07:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="15:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>✅</td></tr>
-                  <tr><td>Kamis</td><td><input type="time" value="07:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="15:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>✅</td></tr>
-                  <tr><td>Jumat</td><td><input type="time" value="07:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="11:30" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>✅</td></tr>
-                  <tr><td>Sabtu</td><td><input type="time" value="08:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td><input type="time" value="12:00" style="border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-family:inherit"/></td><td>—</td></tr>
-                </tbody>
-              </table>
-              <button class="btn btn-primary" style="margin-top:16px" onclick="showToast('✅ Jadwal availabilitas berhasil disimpan!')">💾 Simpan Jadwal</button>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>⚙️ Pengaturan Slot</h3></div>
-            <div class="card-body">
-              <div class="form-g">
-                <label>Durasi per Sesi</label>
-                <select><option>45 menit</option><option>60 menit</option><option>30 menit</option></select>
-              </div>
-              <div class="form-g">
-                <label>Maks. Sesi per Hari</label>
-                <input type="number" value="6" min="1" max="12"/>
-              </div>
-              <div class="form-g">
-                <label>Jeda Antar Sesi</label>
-                <select><option>15 menit</option><option>30 menit</option><option>Tidak ada</option></select>
-              </div>
-              <div class="form-g">
-                <label>Metode Konseling</label>
-                <select><option>Tatap Muka</option><option>Online (Google Meet)</option><option>Keduanya</option></select>
-              </div>
-              <button class="btn btn-primary" onclick="showToast('⚙️ Pengaturan berhasil disimpan!')">💾 Simpan Pengaturan</button>
-            </div>
+          <div class="card-body" id="lap-chart">
+            <div class="loading"><div class="spinner"></div>Memuat laporan...</div>
           </div>
         </div>
       </div>
@@ -1430,7 +759,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
   <div class="modal-box">
     <div class="modal-icon">🎉</div>
     <h3>Permohonan Terkirim!</h3>
-    <p>Jadwal konseling kamu telah berhasil dikirim ke Guru BK. Konfirmasi akan masuk melalui notifikasi dalam 1×24 jam.</p>
+    <p>Jadwal konseling kamu telah <strong>tersimpan di database</strong> dan menunggu konfirmasi dari Guru BK.</p>
     <button class="btn btn-primary" style="width:100%" onclick="closeModal()">Oke, Terima Kasih!</button>
   </div>
 </div>
@@ -1443,37 +772,61 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:va
 let currentRole = 'siswa';
 let selectedKonselor = 'Ibu Sari Dewi, S.Pd';
 let selectedJenis = 'Konseling Individu';
-let selectedTgl = '—';
-let selectedJam = '—';
+let selectedTgl = '';
+let selectedJam = '';
+let allBookings = [];
+let currentFilter = '';
+let currentSiswaName = 'Siswa';
 
-const hints = {
-  siswa: 'Siswa: <b>siswa@sekolah.id</b> / pass: <b>siswa123</b>',
-  guru: 'Guru BK: <b>guru@sekolah.id</b> / pass: <b>guru123</b>',
-  admin: 'Admin: <b>admin@sekolah.id</b> / pass: <b>admin123</b>'
+const accounts = {
+  'siswa@sekolah.id': {pass:'siswa123', role:'siswa', nama:'Rizky Firmansyah', kelas:'XI IPA 2'},
+  'guru@sekolah.id':  {pass:'guru123',  role:'guru',  nama:'Sari Dewi, S.Pd', kelas:'Guru BK'},
+  'admin@sekolah.id': {pass:'admin123', role:'guru',  nama:'Admin', kelas:'Administrator'},
 };
 
+// ===== LOGIN =====
 function setRole(role, el) {
   currentRole = role;
   document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
+  const hints = {
+    siswa: 'Siswa: <b>siswa@sekolah.id</b> / pass: <b>siswa123</b>',
+    guru: 'Guru BK: <b>guru@sekolah.id</b> / pass: <b>guru123</b>'
+  };
   document.getElementById('hint-text').innerHTML = hints[role];
 }
 
 function doLogin() {
-  const email = document.getElementById('login-email').value;
+  const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
-  const valid = {
-    'siswa@sekolah.id': {pass:'siswa123', page:'siswa'},
-    'guru@sekolah.id': {pass:'guru123', page:'guru'},
-    'admin@sekolah.id': {pass:'admin123', page:'siswa'}
-  };
-  if(valid[email] && valid[email].pass === pass) {
-    showPage(valid[email].page);
+  const acc = accounts[email];
+  if (acc && acc.pass === pass) {
+    currentSiswaName = acc.nama;
+    if (acc.role === 'siswa') {
+      document.getElementById('siswa-nama-nav').textContent = acc.nama;
+      document.getElementById('siswa-kelas-nav').textContent = acc.kelas;
+      document.getElementById('siswa-welcome').textContent = `Selamat Datang, ${acc.nama.split(' ')[0]} 👋`;
+      showPage('siswa');
+      loadSiswaDashboard();
+    } else {
+      showPage('guru');
+      loadGuruData();
+    }
+  } else if (!email || !pass) {
+    // demo login by role tab
+    if (currentRole === 'siswa') {
+      currentSiswaName = 'Demo Siswa';
+      document.getElementById('siswa-nama-nav').textContent = 'Demo Siswa';
+      document.getElementById('siswa-kelas-nav').textContent = 'XI IPA 1';
+      document.getElementById('siswa-welcome').textContent = 'Selamat Datang, Demo 👋';
+      showPage('siswa');
+      loadSiswaDashboard();
+    } else {
+      showPage('guru');
+      loadGuruData();
+    }
   } else {
-    // auto-login by role for demo
-    if(currentRole === 'siswa') showPage('siswa');
-    else if(currentRole === 'guru') showPage('guru');
-    else showPage('siswa');
+    showToast('❌ Email atau password salah!');
   }
 }
 
@@ -1482,38 +835,39 @@ function showPage(p) {
   document.getElementById('page-' + p).classList.add('active');
 }
 
-function logout() {
-  showPage('login');
-}
+function logout() { showPage('login'); }
 
 // ===== SISWA SECTIONS =====
 function showSiswaSection(sec, el) {
-  ['dashboard','booking','jadwal','riwayat','profil'].forEach(s => {
-    const el = document.getElementById('ss-' + s);
-    if(el) el.style.display = 'none';
+  ['dashboard','booking','jadwal','riwayat'].forEach(s => {
+    const e = document.getElementById('ss-' + s);
+    if (e) e.style.display = 'none';
   });
   const target = document.getElementById('ss-' + sec);
-  if(target) target.style.display = 'block';
-  if(el) {
+  if (target) target.style.display = 'block';
+  if (el) {
     document.querySelectorAll('#page-siswa .sidebar-item').forEach(x => x.classList.remove('active'));
     el.classList.add('active');
   }
-  document.querySelectorAll('#page-siswa .nav-menu a').forEach(a => a.classList.remove('active'));
-  if(sec === 'booking') goStep(1);
+  if (sec === 'booking') goStep(1);
+  if (sec === 'jadwal') loadJadwalSaya();
+  if (sec === 'riwayat') loadRiwayat();
 }
 
 // ===== GURU SECTIONS =====
 function showGuruSection(sec, el) {
-  ['dashboard','permohonan','jadwal','siswa','laporan','availabilitas'].forEach(s => {
+  ['dashboard','permohonan','jadwal','laporan'].forEach(s => {
     const e = document.getElementById('gs-' + s);
-    if(e) e.style.display = 'none';
+    if (e) e.style.display = 'none';
   });
   const target = document.getElementById('gs-' + sec);
-  if(target) target.style.display = 'block';
-  if(el) {
+  if (target) target.style.display = 'block';
+  if (el) {
     document.querySelectorAll('#page-guru .sidebar-item').forEach(x => x.classList.remove('active'));
     el.classList.add('active');
   }
+  if (sec === 'laporan') renderLaporan();
+  if (sec === 'jadwal') renderSemuaJadwal();
 }
 
 // ===== BOOKING =====
@@ -1546,29 +900,26 @@ function goStep(n) {
   });
 }
 
-// Build booking calendar
-(function(){
+// Build calendar
+(function() {
   const cal = document.getElementById('bookingCal');
-  if(!cal) return;
-  const days = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
-  const dots = [24,25,27,28,3,4,6];
-  days.forEach(d => {
+  if (!cal) return;
+  ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].forEach(d => {
     const el = document.createElement('div');
     el.className = 'cal-dl'; el.textContent = d; cal.appendChild(el);
   });
-  for(let i=0;i<6;i++){
-    const el = document.createElement('div');
-    el.className = 'cal-d empty'; cal.appendChild(el);
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement('div'); el.className = 'cal-d empty'; cal.appendChild(el);
   }
-  for(let d=1;d<=28;d++){
+  for (let d = 1; d <= 28; d++) {
     const el = document.createElement('div');
     el.className = 'cal-d';
-    if(d < 24) el.classList.add('past');
-    if(d === 24) el.classList.add('today');
-    if(dots.includes(d)) el.classList.add('dot');
+    if (d < 24) el.classList.add('past');
+    if (d === 24) el.classList.add('today');
+    if ([24,25,27,28,3,4,6].includes(d)) el.classList.add('dot');
     el.textContent = d;
-    if(!el.classList.contains('past')){
-      el.addEventListener('click', function(){
+    if (!el.classList.contains('past')) {
+      el.addEventListener('click', function() {
         document.querySelectorAll('#bookingCal .cal-d.selected').forEach(x => x.classList.remove('selected'));
         this.classList.add('selected');
         selectedTgl = d + ' Februari 2026';
@@ -1579,34 +930,315 @@ function goStep(n) {
   }
 })();
 
-function submitBooking() {
-  document.getElementById('modal').classList.add('show');
+// ===== SUBMIT BOOKING KE FIREBASE =====
+async function submitBooking() {
+  const nama = document.getElementById('input-nama').value.trim();
+  const kelas = document.getElementById('input-kelas').value;
+  const hp = document.getElementById('input-hp').value.trim();
+  const topik = document.getElementById('input-topik').value.trim();
+  const metode = document.getElementById('input-metode').value;
+
+  if (!nama) { showToast('⚠️ Nama lengkap wajib diisi!'); return; }
+  if (!kelas) { showToast('⚠️ Kelas wajib dipilih!'); return; }
+  if (!hp) { showToast('⚠️ No. HP wajib diisi!'); return; }
+  if (!selectedTgl) { showToast('⚠️ Pilih tanggal dulu!'); return; }
+  if (!selectedJam) { showToast('⚠️ Pilih waktu dulu!'); return; }
+
+  const btn = document.getElementById('btn-submit-booking');
+  btn.disabled = true;
+  btn.textContent = '⏳ Menyimpan...';
+
+  const data = {
+    namaSiswa: nama,
+    kelas: kelas,
+    hp: hp,
+    topik: topik || 'Tidak disebutkan',
+    metode: metode,
+    konselor: selectedKonselor,
+    jenisKonseling: selectedJenis,
+    tanggal: selectedTgl,
+    waktu: selectedJam,
+    lokasi: 'Ruang BK Lt. 2'
+  };
+
+  try {
+    if (typeof window.simpanBooking === 'function') {
+      await window.simpanBooking(data);
+      currentSiswaName = nama;
+    }
+    btn.disabled = false;
+    btn.textContent = '✅ Kirim Permohonan';
+    document.getElementById('modal').classList.add('show');
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '✅ Kirim Permohonan';
+    showToast('❌ Gagal menyimpan. Cek koneksi internet!');
+    console.error(e);
+  }
 }
 
 function closeModal() {
   document.getElementById('modal').classList.remove('show');
   showSiswaSection('jadwal');
+  loadJadwalSaya();
 }
 
-// ===== GURU ACTIONS =====
-function approveBooking(btn) {
-  const card = btn.closest('.approval-card') || btn.closest('tr');
-  if(card) {
-    const badge = card.querySelector('.badge') || card.querySelector('td:nth-child(6)');
-    if(badge) { badge.className='badge badge-green'; badge.textContent='✓ Disetujui'; }
-    const actions = card.querySelector('.appr-actions') || card.querySelector('td:last-child');
-    if(actions) actions.innerHTML = '<span class="badge badge-green">✓ Disetujui</span>';
+// ===== LOAD DATA SISWA =====
+function loadSiswaDashboard() {
+  if (typeof window.loadBookings !== 'function') return;
+  window.loadBookings(function(list) {
+    const mine = list.filter(b => b.namaSiswa && b.namaSiswa.toLowerCase().includes(currentSiswaName.split(' ')[0].toLowerCase()));
+    document.getElementById('stat-aktif').textContent = mine.filter(b => b.status === 'dikonfirmasi').length;
+    document.getElementById('stat-selesai').textContent = mine.filter(b => b.status === 'selesai').length;
+    document.getElementById('stat-menunggu').textContent = mine.filter(b => b.status === 'menunggu').length;
+
+    const aktif = mine.filter(b => b.status !== 'selesai' && b.status !== 'ditolak').slice(0, 3);
+    const container = document.getElementById('dashboard-jadwal-list');
+    if (aktif.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="es-icon">📅</div><p>Belum ada jadwal. <a href="#" onclick="showSiswaSection(\'booking\')" style="color:var(--sage)">Buat sekarang!</a></p></div>';
+    } else {
+      container.innerHTML = aktif.map(b => renderApprovalCard(b, false)).join('');
+    }
+  });
+}
+
+function loadJadwalSaya() {
+  const container = document.getElementById('jadwal-saya-list');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Memuat jadwal...</div>';
+  if (typeof window.loadBookings !== 'function') return;
+  window.loadBookings(function(list) {
+    const mine = list.filter(b => b.namaSiswa && b.namaSiswa.toLowerCase().includes(currentSiswaName.split(' ')[0].toLowerCase()))
+                     .filter(b => b.status !== 'selesai');
+    if (mine.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="es-icon">📅</div><p>Belum ada jadwal aktif.</p></div>';
+    } else {
+      container.innerHTML = mine.map(b => renderApprovalCard(b, false)).join('');
+    }
+  });
+}
+
+function loadRiwayat() {
+  const container = document.getElementById('riwayat-list');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Memuat riwayat...</div>';
+  if (typeof window.loadBookings !== 'function') return;
+  window.loadBookings(function(list) {
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:40px"><div class="es-icon">📂</div><p>Belum ada riwayat konseling.</p></div>';
+      return;
+    }
+    container.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Nama</th><th>Kelas</th><th>Jenis</th><th>Konselor</th><th>Tanggal</th><th>Waktu</th><th>Status</th></tr></thead>
+        <tbody>${list.map(b => `
+          <tr>
+            <td><strong>${b.namaSiswa||'—'}</strong></td>
+            <td>${b.kelas||'—'}</td>
+            <td>${b.jenisKonseling||'—'}</td>
+            <td>${b.konselor||'—'}</td>
+            <td>${b.tanggal||'—'}</td>
+            <td>${b.waktu||'—'}</td>
+            <td>${badgeStatus(b.status)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  });
+}
+
+// ===== LOAD DATA GURU =====
+function loadGuruData() {
+  if (typeof window.loadBookings !== 'function') return;
+  window.loadBookings(function(list) {
+    allBookings = list;
+    const menunggu = list.filter(b => b.status === 'menunggu').length;
+    const konfirmasi = list.filter(b => b.status === 'dikonfirmasi').length;
+    const selesai = list.filter(b => b.status === 'selesai').length;
+
+    document.getElementById('gstat-menunggu').textContent = menunggu;
+    document.getElementById('gstat-konfirmasi').textContent = konfirmasi;
+    document.getElementById('gstat-total').textContent = list.length;
+    document.getElementById('gstat-selesai').textContent = selesai;
+    document.getElementById('badge-permohonan').textContent = menunggu;
+
+    // Dashboard list (5 terbaru)
+    const recent = [...list].reverse().slice(0, 5);
+    const dashList = document.getElementById('guru-dashboard-list');
+    if (recent.length === 0) {
+      dashList.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><p>Belum ada permohonan masuk.</p></div>';
+    } else {
+      dashList.innerHTML = recent.map(b => renderApprovalCard(b, true)).join('');
+    }
+
+    renderPermohonanTable(list);
+    renderSemuaJadwal();
+    renderLaporan();
+  });
+}
+
+function filterStatus(status) {
+  currentFilter = status;
+  const filtered = status ? allBookings.filter(b => b.status === status) : allBookings;
+  renderPermohonanTable(filtered);
+}
+
+function renderPermohonanTable(list) {
+  const wrap = document.getElementById('permohonan-table-wrap');
+  if (!wrap) return;
+  if (list.length === 0) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:40px"><div class="es-icon">📭</div><p>Tidak ada permohonan ditemukan.</p></div>';
+    return;
   }
-  showToast('✅ Permohonan berhasil disetujui!');
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Nama Siswa</th><th>Kelas</th><th>Jenis</th><th>Konselor</th><th>Tanggal</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody>${[...list].reverse().map(b => `
+        <tr id="row-${b.id}">
+          <td><strong>${b.namaSiswa||'—'}</strong><br><small style="color:var(--text-3)">${b.hp||''}</small></td>
+          <td>${b.kelas||'—'}</td>
+          <td><span class="badge badge-blue">${b.jenisKonseling||'—'}</span></td>
+          <td>${b.konselor||'—'}</td>
+          <td>${b.tanggal||'—'}</td>
+          <td>${b.waktu||'—'}</td>
+          <td>${badgeStatus(b.status)}</td>
+          <td>
+            ${b.status === 'menunggu' ? `
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-sm btn-primary" onclick="approveBooking('${b.id}',this)">✓ Setujui</button>
+                <button class="btn btn-sm btn-danger" onclick="rejectBooking('${b.id}',this)">✗ Tolak</button>
+              </div>` : 
+            b.status === 'dikonfirmasi' ? `<button class="btn btn-sm btn-secondary" onclick="selesaiBooking('${b.id}',this)">✔ Selesai</button>` :
+            `<span style="color:var(--text-3);font-size:0.8rem">—</span>`}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }
 
-function rejectBooking(btn) {
-  const card = btn.closest('.approval-card') || btn.closest('tr');
-  if(card) card.style.opacity = '.4';
-  showToast('✗ Permohonan ditolak');
+function renderSemuaJadwal() {
+  const wrap = document.getElementById('semua-jadwal-wrap');
+  if (!wrap) return;
+  if (allBookings.length === 0) {
+    wrap.innerHTML = '<div class="empty-state" style="padding:40px"><div class="es-icon">📭</div><p>Belum ada jadwal tersimpan.</p></div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Nama Siswa</th><th>Kelas</th><th>Jenis Konseling</th><th>Konselor</th><th>Tanggal</th><th>Waktu</th><th>Topik</th><th>Status</th></tr></thead>
+      <tbody>${[...allBookings].reverse().map(b => `
+        <tr>
+          <td><strong>${b.namaSiswa||'—'}</strong></td>
+          <td>${b.kelas||'—'}</td>
+          <td>${b.jenisKonseling||'—'}</td>
+          <td>${b.konselor||'—'}</td>
+          <td>${b.tanggal||'—'}</td>
+          <td>${b.waktu||'—'}</td>
+          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${b.topik||''}">${b.topik||'—'}</td>
+          <td>${badgeStatus(b.status)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }
 
-// ===== TOAST =====
+function renderLaporan() {
+  const total = allBookings.length;
+  const konfirmasi = allBookings.filter(b => b.status === 'dikonfirmasi').length;
+  const menunggu = allBookings.filter(b => b.status === 'menunggu').length;
+  const e1 = document.getElementById('lap-total');
+  const e2 = document.getElementById('lap-konfirmasi');
+  const e3 = document.getElementById('lap-menunggu');
+  if (e1) e1.textContent = total;
+  if (e2) e2.textContent = konfirmasi;
+  if (e3) e3.textContent = menunggu;
+
+  const jenisCounts = {};
+  allBookings.forEach(b => {
+    const j = b.jenisKonseling || 'Lainnya';
+    jenisCounts[j] = (jenisCounts[j] || 0) + 1;
+  });
+
+  const chartEl = document.getElementById('lap-chart');
+  if (!chartEl) return;
+  if (total === 0) {
+    chartEl.innerHTML = '<div class="empty-state"><div class="es-icon">📊</div><p>Belum ada data untuk ditampilkan.</p></div>';
+    return;
+  }
+  const colors = ['var(--sage)','var(--blue)','var(--accent)','#9FA8DA','#80CBC4'];
+  let i = 0;
+  chartEl.innerHTML = `<div class="bar-chart">
+    ${Object.entries(jenisCounts).map(([label, count]) => `
+      <div class="bar-row">
+        <div class="bar-label" style="width:160px">${label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(count/total*100)}%;background:${colors[i++%colors.length]}"></div></div>
+        <div class="bar-val">${count}</div>
+      </div>`).join('')}
+  </div>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:0.82rem;color:var(--text-2)">Total semua permohonan</span>
+    <span style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--sage-dark)">${total}</span>
+  </div>`;
+}
+
+// ===== ACTIONS =====
+async function approveBooking(id, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await window.updateStatus(id, 'dikonfirmasi');
+    showToast('✅ Permohonan berhasil disetujui!');
+  } catch(e) { showToast('❌ Gagal update status'); btn.disabled = false; }
+}
+
+async function rejectBooking(id, btn) {
+  btn.disabled = true;
+  try {
+    await window.updateStatus(id, 'ditolak');
+    showToast('✗ Permohonan ditolak');
+  } catch(e) { showToast('❌ Gagal update status'); btn.disabled = false; }
+}
+
+async function selesaiBooking(id, btn) {
+  btn.disabled = true;
+  try {
+    await window.updateStatus(id, 'selesai');
+    showToast('✔ Sesi ditandai selesai!');
+  } catch(e) { showToast('❌ Gagal update status'); btn.disabled = false; }
+}
+
+// ===== HELPERS =====
+function badgeStatus(status) {
+  const map = {
+    menunggu: '<span class="badge badge-yellow">⏳ Menunggu</span>',
+    dikonfirmasi: '<span class="badge badge-green">✓ Dikonfirmasi</span>',
+    ditolak: '<span class="badge badge-red">✗ Ditolak</span>',
+    selesai: '<span class="badge badge-purple">✔ Selesai</span>',
+  };
+  return map[status] || '<span class="badge">—</span>';
+}
+
+function renderApprovalCard(b, showActions) {
+  const tgl = b.tanggal ? b.tanggal.split(' ') : ['—','—','—'];
+  const day = tgl[0] || '—';
+  const mon = tgl[1] ? tgl[1].substring(0,3) : '—';
+  return `
+    <div class="approval-card">
+      <div class="appr-date">
+        <span class="ad-day">${day}</span>
+        <span class="ad-mon">${mon}</span>
+      </div>
+      <div class="appr-info">
+        <h4>${b.namaSiswa||'—'} · ${b.jenisKonseling||'—'}</h4>
+        <div class="appr-meta">
+          <span>👩‍🏫 ${b.konselor||'—'}</span>
+          <span>⏰ ${b.waktu||'—'}</span>
+          <span>🏫 ${b.kelas||'—'}</span>
+        </div>
+      </div>
+      ${showActions && b.status === 'menunggu' ? `
+        <div class="appr-actions">
+          <button class="btn btn-sm btn-primary" onclick="approveBooking('${b.id}',this)">✓</button>
+          <button class="btn btn-sm btn-danger" onclick="rejectBooking('${b.id}',this)">✗</button>
+        </div>` : badgeStatus(b.status)}
+    </div>`;
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
@@ -1614,13 +1246,5 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 </script>
-</html>
-<div style="text-align:center; margin-top:30px;">
-    <a href="https://forms.gle/WCt3KBbsRZnYnE3N6" target="_blank">
-        <button style="padding:12px 25px; font-size:16px; cursor:pointer;">
-            Isi Kuesioner Sekarang
-        </button>
-    </a>
-</div>
-
 </body>
+</html>
